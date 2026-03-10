@@ -3,6 +3,17 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const { execSync } = require("child_process");
+
+// Run Prisma migrations at startup (DATABASE_URL only available at runtime on Railway)
+try {
+  console.log("Running database migrations...");
+  execSync("npx prisma migrate deploy", { cwd: __dirname, stdio: "inherit" });
+  console.log("Migrations complete.");
+} catch (err) {
+  console.error("Migration failed:", err.message);
+  process.exit(1);
+}
 
 const customerRoutes = require("./routes/customers");
 const adminRoutes = require("./routes/admin");
