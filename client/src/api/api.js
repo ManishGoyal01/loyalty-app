@@ -8,8 +8,8 @@ export function registerCustomer(phone) {
   return api.post('/api/customers/register', { phone });
 }
 
-export function checkinCustomer(phone) {
-  return api.post('/api/customers/checkin', { phone });
+export function checkinCustomer(phone, lat, lng) {
+  return api.post('/api/customers/checkin', { phone, lat, lng });
 }
 
 export function claimReward(phone) {
@@ -46,4 +46,10 @@ export function updateReward(token, icon, name) {
     { icon, name },
     { headers: { Authorization: `Bearer ${token}` } }
   );
+}
+
+export function getAdminShopInfo(token) {
+  return api.get('/api/admin/shop-info', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }

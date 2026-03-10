@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const prisma = require("../db/prisma");
 const { todayIST, yesterdayIST } = require("../helpers/dateHelpers");
+const { isNearShop } = require("../helpers/geoHelpers");
 
 // POST /register
 router.post("/register", async (req, res) => {
@@ -39,7 +40,16 @@ router.post("/register", async (req, res) => {
 // POST /checkin
 router.post("/checkin", async (req, res) => {
   try {
-    const { phone } = req.body;
+    const { phone, lat, lng } = req.body;
+
+    // Verify customer is physically near the shop
+    if (lat == null || lng == null) {
+      return res.status(403).json({ error: "Location required. Please allow location access to check in." });
+    }
+
+    if (!isNearShop(lat, lng)) {
+      return res.status(403).json({ error: "You need to be at the shop to check in. Visit us today!" });
+    }
 
     const customer = await prisma.customer.findUnique({ where: { phone } });
 

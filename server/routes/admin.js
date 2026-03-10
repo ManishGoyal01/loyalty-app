@@ -85,4 +85,13 @@ router.post("/reward", authMiddleware, async (req, res) => {
   }
 });
 
+// GET /shop-info (protected) — returns shop location config
+router.get("/shop-info", authMiddleware, (req, res) => {
+  return res.json({
+    lat: parseFloat(process.env.SHOP_LAT) || null,
+    lng: parseFloat(process.env.SHOP_LNG) || null,
+    radius: parseFloat(process.env.SHOP_RADIUS) || 100,
+  });
+});
+
 module.exports = router;
