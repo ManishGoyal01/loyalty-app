@@ -7,8 +7,8 @@ COPY . .
 
 # Install server dependencies (production only + prisma)
 WORKDIR /app/server
-RUN npm ci --omit=dev
-RUN npx prisma generate
+RUN npm ci
+RUN ./node_modules/.bin/prisma generate
 
 # Install client dependencies and build
 WORKDIR /app/client
