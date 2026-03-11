@@ -10,11 +10,11 @@ COPY . .
 # Install server dependencies and generate Prisma client
 WORKDIR /app/server
 RUN npm install
-RUN npx prisma generate
+RUN node_modules/.bin/prisma generate
 
 # Install client dependencies and build
 WORKDIR /app/client
-RUN npm ci
+RUN npm install
 RUN npm run build
 
 # Copy built client to server/public
