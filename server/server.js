@@ -8,7 +8,7 @@ const { execSync } = require("child_process");
 // Run Prisma migrations at startup (DATABASE_URL only available at runtime on Railway)
 try {
   console.log("Running database migrations...");
-  execSync("npx prisma migrate deploy", { cwd: __dirname, stdio: "inherit" });
+  execSync("npx prisma@5.22.0 migrate deploy", { cwd: __dirname, stdio: "inherit" });
   console.log("Migrations complete.");
 } catch (err) {
   console.error("Migration failed:", err.message);
