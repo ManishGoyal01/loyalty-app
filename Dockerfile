@@ -9,8 +9,8 @@ COPY . .
 
 # Install server dependencies and generate Prisma client
 WORKDIR /app/server
-RUN npm ci
-RUN node node_modules/prisma/build/index.js generate
+RUN npm install
+RUN npx prisma generate
 
 # Install client dependencies and build
 WORKDIR /app/client
