@@ -10,7 +10,7 @@ COPY . .
 # Install server dependencies and generate Prisma client
 WORKDIR /app/server
 RUN npm install
-RUN node_modules/.bin/prisma generate
+RUN npm run prisma:generate
 
 # Install client dependencies and build
 WORKDIR /app/client

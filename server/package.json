@@ -4,6 +4,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "prisma:generate": "prisma generate",
     "dev": "nodemon server.js",
     "build:client": "cd ../client && npm install && npm run build",
     "railway:build": "npm install && npx prisma generate && npx prisma migrate deploy && npm run build:client && cp -r ../client/dist ./public"
