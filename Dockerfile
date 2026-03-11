@@ -1,11 +1,15 @@
 FROM node:18-alpine
 
+RUN apk add --no-cache --allow-untrusted --repository http://dl-cdn.alpinelinux.org/alpine/v3.21/main openssl
+
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0
+
 WORKDIR /app
 
 # Copy everything
 COPY . .
 
-# Install server dependencies (production only + prisma)
+# Install server dependencies and generate Prisma client
 WORKDIR /app/server
 RUN npm ci
 RUN npx prisma@5.22.0 generate
