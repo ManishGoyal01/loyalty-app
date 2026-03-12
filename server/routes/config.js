@@ -1,22 +1,20 @@
 const express = require("express");
 const router = express.Router();
-const prisma = require("../db/prisma");
+const { pool } = require("../db/init");
 
 // GET /
 router.get("/", async (req, res) => {
   try {
-    let config = await prisma.config.findUnique({ where: { id: 1 } });
+    let result = await pool.query('SELECT * FROM "Config" WHERE id = 1');
 
-    if (!config) {
-      config = await prisma.config.create({
-        data: {
-          rewardIcon: "🥛",
-          rewardName: "1 Milk Packet — FREE",
-          totalClaimed: 0,
-        },
-      });
+    if (result.rows.length === 0) {
+      result = await pool.query(
+        'INSERT INTO "Config" (id, "rewardIcon", "rewardName", "totalClaimed") VALUES (1, $1, $2, 0) RETURNING *',
+        ['🥛', '1 Milk Packet — FREE']
+      );
     }
 
+    const config = result.rows[0];
     return res.json({
       rewardIcon: config.rewardIcon,
       rewardName: config.rewardName,

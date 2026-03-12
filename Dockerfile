@@ -1,16 +1,13 @@
 FROM node:18-alpine
 
-RUN apk add --no-cache openssl
-
 WORKDIR /app
 
 # Copy everything
 COPY . .
 
-# Install server dependencies and generate Prisma client
+# Install server dependencies
 WORKDIR /app/server
 RUN npm install
-RUN npm run prisma:generate
 
 # Install client dependencies and build
 WORKDIR /app/client

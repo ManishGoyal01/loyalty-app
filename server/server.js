@@ -3,17 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
-const { execSync } = require("child_process");
-
-// Run Prisma migrations at startup (DATABASE_URL only available at runtime on Railway)
-try {
-  console.log("Running database migrations...");
-  execSync("npx prisma@5.22.0 migrate deploy", { cwd: __dirname, stdio: "inherit" });
-  console.log("Migrations complete.");
-} catch (err) {
-  console.error("Migration failed:", err.message);
-  process.exit(1);
-}
+const { initDB } = require("./db/init");
 
 const customerRoutes = require("./routes/customers");
 const adminRoutes = require("./routes/admin");
@@ -22,8 +12,7 @@ const configRoutes = require("./routes/config");
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS setup — needed for local dev (separate Vite dev server)
-// In production on Railway, frontend is served from Express so CORS is same-origin
+// CORS setup
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   "http://localhost:5173",
@@ -63,6 +52,15 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Initialize database tables and start server
+initDB()
+  .then(() => {
+    console.log("Database tables ready.");
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Database initialization failed:", err.message);
+    process.exit(1);
+  });

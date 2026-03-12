@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const jwt = require("jsonwebtoken");
-const prisma = require("../db/prisma");
+const { pool } = require("../db/init");
 const { todayIST } = require("../helpers/dateHelpers");
 const authMiddleware = require("../middleware/authMiddleware");
 
@@ -34,13 +34,13 @@ router.get("/stats", authMiddleware, async (req, res) => {
   try {
     const today = todayIST();
 
-    const totalCustomers = await prisma.customer.count();
-    const activeToday = await prisma.customer.count({
-      where: { lastScan: today },
-    });
+    const totalResult = await pool.query('SELECT COUNT(*) FROM "Customer"');
+    const activeResult = await pool.query('SELECT COUNT(*) FROM "Customer" WHERE "lastScan" = $1', [today]);
+    const configResult = await pool.query('SELECT "totalClaimed" FROM "Config" WHERE id = 1');
 
-    const config = await prisma.config.findUnique({ where: { id: 1 } });
-    const totalClaimed = config ? config.totalClaimed : 0;
+    const totalCustomers = parseInt(totalResult.rows[0].count);
+    const activeToday = parseInt(activeResult.rows[0].count);
+    const totalClaimed = configResult.rows.length > 0 ? configResult.rows[0].totalClaimed : 0;
 
     return res.json({ totalCustomers, activeToday, totalClaimed });
   } catch (err) {
@@ -52,11 +52,8 @@ router.get("/stats", authMiddleware, async (req, res) => {
 // GET /customers (protected)
 router.get("/customers", authMiddleware, async (req, res) => {
   try {
-    const customers = await prisma.customer.findMany({
-      orderBy: { streak: "desc" },
-    });
-
-    return res.json(customers);
+    const result = await pool.query('SELECT * FROM "Customer" ORDER BY streak DESC');
+    return res.json(result.rows);
   } catch (err) {
     console.error("Get customers error:", err);
     return res.status(500).json({ error: "Internal server error" });
@@ -68,15 +65,11 @@ router.post("/reward", authMiddleware, async (req, res) => {
   try {
     const { icon, name } = req.body;
 
-    await prisma.config.upsert({
-      where: { id: 1 },
-      update: { rewardIcon: icon, rewardName: name },
-      create: {
-        rewardIcon: icon,
-        rewardName: name,
-        totalClaimed: 0,
-      },
-    });
+    await pool.query(`
+      INSERT INTO "Config" (id, "rewardIcon", "rewardName", "totalClaimed")
+      VALUES (1, $1, $2, 0)
+      ON CONFLICT (id) DO UPDATE SET "rewardIcon" = $1, "rewardName" = $2
+    `, [icon, name]);
 
     return res.json({ success: true });
   } catch (err) {
@@ -85,7 +78,7 @@ router.post("/reward", authMiddleware, async (req, res) => {
   }
 });
 
-// GET /shop-info (protected) — returns shop location config
+// GET /shop-info (protected)
 router.get("/shop-info", authMiddleware, (req, res) => {
   return res.json({
     lat: parseFloat(process.env.SHOP_LAT) || null,

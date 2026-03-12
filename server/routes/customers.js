@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const prisma = require("../db/prisma");
+const { pool } = require("../db/init");
 const { todayIST, yesterdayIST } = require("../helpers/dateHelpers");
 const { isNearShop } = require("../helpers/geoHelpers");
 
@@ -13,24 +13,18 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ error: "Phone must be exactly 10 digits" });
     }
 
-    let customer = await prisma.customer.findUnique({ where: { phone } });
+    const existing = await pool.query('SELECT * FROM "Customer" WHERE phone = $1', [phone]);
 
-    if (customer) {
-      return res.json(customer);
+    if (existing.rows.length > 0) {
+      return res.json(existing.rows[0]);
     }
 
-    customer = await prisma.customer.create({
-      data: {
-        phone,
-        streak: 0,
-        lastScan: null,
-        history: [],
-        complete: false,
-        joinDate: todayIST(),
-      },
-    });
+    const result = await pool.query(
+      'INSERT INTO "Customer" (phone, streak, "lastScan", history, complete, "joinDate") VALUES ($1, 0, NULL, $2, false, $3) RETURNING *',
+      [phone, '{}', todayIST()]
+    );
 
-    return res.json(customer);
+    return res.json(result.rows[0]);
   } catch (err) {
     console.error("Register error:", err);
     return res.status(500).json({ error: "Internal server error" });
@@ -42,7 +36,6 @@ router.post("/checkin", async (req, res) => {
   try {
     const { phone, lat, lng } = req.body;
 
-    // Verify customer is physically near the shop
     if (lat == null || lng == null) {
       return res.status(403).json({ error: "Location required. Please allow location access to check in." });
     }
@@ -51,12 +44,13 @@ router.post("/checkin", async (req, res) => {
       return res.status(403).json({ error: "You need to be at the shop to check in. Visit us today!" });
     }
 
-    const customer = await prisma.customer.findUnique({ where: { phone } });
+    const result = await pool.query('SELECT * FROM "Customer" WHERE phone = $1', [phone]);
 
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Customer not found" });
     }
 
+    const customer = result.rows[0];
     const today = todayIST();
     const yesterday = yesterdayIST();
 
@@ -71,7 +65,7 @@ router.post("/checkin", async (req, res) => {
     }
 
     let newStreak = customer.streak;
-    let newHistory = [...customer.history];
+    let newHistory = customer.history || [];
 
     // If last scan was not yesterday and customer has scanned before, reset streak
     if (customer.lastScan !== yesterday && customer.lastScan !== null) {
@@ -79,25 +73,19 @@ router.post("/checkin", async (req, res) => {
       newHistory = [];
     }
 
-    // Increment streak
     newStreak += 1;
     newHistory.push(today);
     const isComplete = newStreak >= 10;
 
-    const updated = await prisma.customer.update({
-      where: { phone },
-      data: {
-        streak: newStreak,
-        lastScan: today,
-        history: newHistory,
-        complete: isComplete,
-      },
-    });
+    const updated = await pool.query(
+      'UPDATE "Customer" SET streak = $1, "lastScan" = $2, history = $3, complete = $4, "updatedAt" = NOW() WHERE phone = $5 RETURNING *',
+      [newStreak, today, newHistory, isComplete, phone]
+    );
 
     return res.json({
-      streak: updated.streak,
-      lastScan: updated.lastScan,
-      complete: updated.complete,
+      streak: updated.rows[0].streak,
+      lastScan: updated.rows[0].lastScan,
+      complete: updated.rows[0].complete,
       alreadyToday: false,
     });
   } catch (err) {
@@ -111,31 +99,22 @@ router.post("/claim", async (req, res) => {
   try {
     const { phone } = req.body;
 
-    const customer = await prisma.customer.findUnique({ where: { phone } });
-    if (!customer) {
+    const result = await pool.query('SELECT * FROM "Customer" WHERE phone = $1', [phone]);
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    await prisma.customer.update({
-      where: { phone },
-      data: {
-        streak: 0,
-        complete: false,
-        history: [],
-        lastScan: null,
-      },
-    });
+    await pool.query(
+      'UPDATE "Customer" SET streak = 0, complete = false, history = $1, "lastScan" = NULL, "updatedAt" = NOW() WHERE phone = $2',
+      ['{}', phone]
+    );
 
-    // Increment totalClaimed in config
-    await prisma.config.upsert({
-      where: { id: 1 },
-      update: { totalClaimed: { increment: 1 } },
-      create: {
-        rewardIcon: "🥛",
-        rewardName: "1 Milk Packet — FREE",
-        totalClaimed: 1,
-      },
-    });
+    // Upsert config and increment totalClaimed
+    await pool.query(`
+      INSERT INTO "Config" (id, "rewardIcon", "rewardName", "totalClaimed")
+      VALUES (1, '🥛', '1 Milk Packet — FREE', 1)
+      ON CONFLICT (id) DO UPDATE SET "totalClaimed" = "Config"."totalClaimed" + 1
+    `);
 
     return res.json({ success: true });
   } catch (err) {
@@ -147,15 +126,13 @@ router.post("/claim", async (req, res) => {
 // GET /:phone
 router.get("/:phone", async (req, res) => {
   try {
-    const customer = await prisma.customer.findUnique({
-      where: { phone: req.params.phone },
-    });
+    const result = await pool.query('SELECT * FROM "Customer" WHERE phone = $1', [req.params.phone]);
 
-    if (!customer) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: "Customer not found" });
     }
 
-    return res.json(customer);
+    return res.json(result.rows[0]);
   } catch (err) {
     console.error("Get customer error:", err);
     return res.status(500).json({ error: "Internal server error" });
