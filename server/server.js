@@ -47,8 +47,12 @@ app.get("/api/health", (req, res) => {
 const clientBuildPath = path.join(__dirname, "public");
 app.use(express.static(clientBuildPath));
 
-// All non-API routes → React app (client-side routing)
+// All non-API, non-file routes → React app (client-side routing)
 app.get("*", (req, res) => {
+  // Don't serve index.html for requests that look like static files
+  if (req.path.match(/\.\w+$/)) {
+    return res.status(404).send("Not found");
+  }
   res.sendFile(path.join(clientBuildPath, "index.html"));
 });
 
